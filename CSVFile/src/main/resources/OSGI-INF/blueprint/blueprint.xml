@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.osgi.org/xmlns/blueprint/v1.0.0      https://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd            http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd">
+    <bean class="org.apache.commons.dbcp.BasicDataSource"
+        destroy-method="close" id="dataSource">
+        <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+        <property name="url" value="jdbc:mysql://localhost:3306/user"/>
+        <property name="username" value="root"/>
+        <property name="password" value="admin"/>
+    </bean>
+    <bean class="org.springframework.core.io.ClassPathResource" id="mybatisConfig">
+        <argument value="SqlMapConfig.xml"/>
+    </bean>
+    <bean class="org.mybatis.spring.SqlSessionFactoryBean" id="sqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="configLocation" ref="mybatisConfig"/>
+    </bean>
+    <bean class="org.apache.ibatis.session.SqlSessionFactory"
+        factory-method="getObject" factory-ref="sqlSessionFactoryBean" id="sqlSessionFactory"/>
+    <bean class="org.apache.camel.component.mybatis.MyBatisComponent" id="mybatis">
+        <property name="sqlSessionFactory" ref="sqlSessionFactory"/>
+    </bean>
+        <bean class="csvdata.expofsmtp" id="attach"/>
+    <camelContext id="cbr-example-context" xmlns="http://camel.apache.org/schema/blueprint">
+       <!--  <route id="_route1">
+            <from id="_from1" uri="file:/tmp?fileName=employee.csv"/>
+            <bean id="_bean2" method="attacher" ref="attacher"/>
+            <to id="_to5" uri="smtp.gmail.com?from=latika.x.bhuttan@fosteringlinux.com&amp;to=latika.bhuttan@gmail.com&amp;subject=test"/>
+        </route> -->
+        <route id="_route2">
+            <from id="_from2" uri="timer://timer1?period=30s"/>
+            <to id="_to1" uri="mybatis:employee?statementType=SelectList"/>
+            <log id="_log5" message="table ${body}"/>
+            <split id="_split1">
+                <simple>${body}</simple>
+                <log id="_log1" message="process row ${body} ** ${header.CamelSplitIndex}"/>
+                <choice id="_choice1">
+                    <when id="_when1">
+                        <simple>${header.CamelSplitIndex} == 0</simple>
+                        <setBody id="_setBody1">
+                            <simple>DateOfBirth,EmployeeName,Designation,Address,Mobile,DOJ\n${body[DateOfBirth]},${body[employeeName]},${body[Designation]},${body[Address]},${body[mobileNo]},${body[DOJ]}\n</simple>
+                        </setBody>
+                        <log id="_log2" message="New Body ${body}"/>
+                        <to id="_to2" uri="file:/tmp?fileName=employee.csv"/>
+                    </when>
+                    <otherwise id="_otherwise1">
+                        <setBody id="_setBody2">
+                            <simple>${body[DateOfBirth]},${body[employeeName]},${body[Designation]},${body[Address]},${body[mobileNo]},${body[DOJ]}\n</simple>
+                        </setBody>
+                        <log id="_log3" message="New Body ${body}"/>
+                        <to id="_to3" uri="file:/tmp?fileName=employee.csv&amp;fileExist=Append"/>
+                    </otherwise>
+                </choice>
+		<choice>
+			<when><simple>${header.CamelSplitComplete}</simple>
+            			<bean ref="attach"/>
+				<setBody><simple>Hii, \nPFA ..</simple></setBody>
+            			<to id="_to4" uri="smtps://smtp.gmail.com?username=latika.x.bhuttan@fosteringlinux.com&amp;password=tavishi@123&amp;to=latika.bhuttan@gmail.com&amp;subject=File"/>
+            			<log id="_log6" message="Mail sent"/>
+			</when>
+		</choice>
+            </split>
+        </route>
+    </camelContext>
+</blueprint>
